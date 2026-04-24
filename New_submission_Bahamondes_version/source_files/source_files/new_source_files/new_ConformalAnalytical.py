@@ -147,7 +147,7 @@ def YSYK_0DNormaliterator(GRomega,DRomega,grid,pars,beta,err=1e-5,ITERMAX=150,et
 
     diff = 1.
     diffG,diffD = (1.0,1.0)
-    epsilon = 0.1
+    epsilon = 0.5
 
     xG, xD = 0.5 - epsilon, 0.5 - epsilon
     xG2, xD2 = 0.5 - epsilon, 0.5 - epsilon

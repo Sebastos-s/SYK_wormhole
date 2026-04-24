@@ -78,7 +78,7 @@ def time2freqMidPoint(array,M,dt):
     '''
     tMinusM = np.arange(2*M)-M
     omega = np.arange(2*M)
-    prefOut = 2*M*dt*np.exp(-2*np.pi*1j*(M-1/2)*omega)
+    prefOut = 2*M*dt*np.exp(-2*np.pi*1j*(M-1/2)*omega/(2*M))
     prefIn = np.exp(-2*np.pi*1j*(tMinusM+1/2)*(M-1/2)/(2*M))
 
     return prefOut*ifft(prefIn*array)
