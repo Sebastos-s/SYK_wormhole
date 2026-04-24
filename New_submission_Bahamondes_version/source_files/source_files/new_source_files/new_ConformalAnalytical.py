@@ -5,7 +5,7 @@ import warnings
 from new_source_files.new_SYK_fft import *
 import matplotlib.pyplot as plt
 
-def rho2sigma2DNormal(rhoG,rhoD,M,dt,t,omega,v,g,beta,delta=1e-6,midPoint=False,QGdefault = True):
+def rho2sigma2DNormal(rhoG,rhoD,M,dt,t,omega,v,g,beta,delta=1e-6,midPoint=False):
     '''
     Function that returns the fermionic and bosonic self-energies in the normal state of
     the 2D system: alpha = 1 (i.e: no superconductivity and no anomalous Green's functions in the
@@ -23,12 +23,12 @@ def rho2sigma2DNormal(rhoG,rhoD,M,dt,t,omega,v,g,beta,delta=1e-6,midPoint=False,
     if not midPoint:
         eta = np.pi/(M*dt)*(0.001)
         rhoGrev = np.concatenate(([rhoG[-1]], rhoG[1:][::-1]))
-        rhoFpp = freq2time(rhoG * fermidirac(beta*omega,default = QGdefault),M,dt)
-        rhoFmp = freq2time(rhoG * fermidirac(-1.*beta*omega,default = QGdefault),M,dt)
-        rhoFpm = freq2time(rhoGrev * fermidirac(beta*(omega),default = QGdefault),M,dt)
-        rhoFmm = freq2time(rhoGrev * fermidirac(-1.*beta*omega,default = QGdefault),M,dt)
-        rhoBpp = freq2time(rhoD * boseeinstein(beta*(omega+eta),default = QGdefault),M,dt)
-        rhoBmp = freq2time(rhoD * boseeinstein(-1.*beta*(omega+eta),default = QGdefault),M,dt)
+        rhoFpp = freq2time(rhoG * fermidirac_stable(beta*omega),M,dt)
+        rhoFmp = freq2time(rhoG * fermidirac_stable(-1.*beta*omega),M,dt)
+        rhoFpm = freq2time(rhoGrev * fermidirac_stable(beta*(omega)),M,dt)
+        rhoFmm = freq2time(rhoGrev * fermidirac_stable(-1.*beta*omega),M,dt)
+        rhoBpp = freq2time(rhoD * boseeinstein_stable(beta*(omega+eta)),M,dt)
+        rhoBmp = freq2time(rhoD * boseeinstein_stable(-1.*beta*(omega+eta)),M,dt)
 
         SigmaInTime = 1.0j * np.exp(-np.abs(delta*t)) * np.heaviside(t,0) * ((v**2)*(rhoFpp+rhoFmp)-(g**2)*(rhoFpp*rhoBpp-rhoFmp*rhoBmp))
         Sigma = time2freq(SigmaInTime,M,dt)
@@ -39,12 +39,12 @@ def rho2sigma2DNormal(rhoG,rhoD,M,dt,t,omega,v,g,beta,delta=1e-6,midPoint=False,
         #rhoG and rhoD are assumed to be evaluated at mid-points of omega and t grids.
         domega = np.pi/(M*dt)
         rhoGrevMidPoint = np.concatenate(([rhoG[-1]], rhoG[1:][::-1]))
-        rhoFppMidPoint = freq2timeMidPoint(rhoG * fermidirac(beta*(omega+domega/2),default = QGdefault),M,dt)
-        rhoFmpMidPoint = freq2timeMidPoint(rhoG * fermidirac(-1.*beta*(omega+domega/2),default = QGdefault),M,dt)
-        rhoFpmMidPoint = freq2timeMidPoint(rhoGrevMidPoint * fermidirac(beta*(omega+domega/2),default = QGdefault),M,dt)
-        rhoFmmMidPoint = freq2timeMidPoint(rhoGrevMidPoint * fermidirac(-1.*beta*(omega+domega/2),default = QGdefault),M,dt)
-        rhoBppMidPoint = freq2timeMidPoint(rhoD * boseeinstein(beta*(omega+domega/2),default = QGdefault),M,dt)
-        rhoBmpMidPoint = freq2timeMidPoint(rhoD * boseeinstein(-1.*beta*(omega+domega/2),default = QGdefault),M,dt)
+        rhoFppMidPoint = freq2timeMidPoint(rhoG * fermidirac_stable(beta*(omega+domega/2)),M,dt)
+        rhoFmpMidPoint = freq2timeMidPoint(rhoG * fermidirac_stable(-1.*beta*(omega+domega/2)),M,dt)
+        rhoFpmMidPoint = freq2timeMidPoint(rhoGrevMidPoint * fermidirac_stable(beta*(omega+domega/2)),M,dt)
+        rhoFmmMidPoint = freq2timeMidPoint(rhoGrevMidPoint * fermidirac_stable(-1.*beta*(omega+domega/2)),M,dt)
+        rhoBppMidPoint = freq2timeMidPoint(rhoD * boseeinstein_stable(beta*(omega+domega/2)),M,dt)
+        rhoBmpMidPoint = freq2timeMidPoint(rhoD * boseeinstein_stable(-1.*beta*(omega+domega/2)),M,dt)
 
         SigmaInTimeMidPoint = 1.0j * np.exp(-np.abs(delta*(t+dt/2))) * np.heaviside(t+dt/2,1) * ((v**2)*(rhoFppMidPoint +\
                             rhoFmpMidPoint)-(g**2)*(rhoFppMidPoint*rhoBppMidPoint-rhoFmpMidPoint*rhoBmpMidPoint))
@@ -56,7 +56,7 @@ def rho2sigma2DNormal(rhoG,rhoD,M,dt,t,omega,v,g,beta,delta=1e-6,midPoint=False,
         
     return [Sigma,Pi]
 
-def rho2sigma0DNormal(rhoG,rhoD,M,dt,t,omega,g,beta,delta=1e-6,midPoint=False,QGdefault = True):
+def rho2sigma0DNormal(rhoG,rhoD,M,dt,t,omega,g,beta,delta=1e-6,midPoint=False):
     '''
     Function that returns the fermionic and bosonic self-energies in the normal state of
     the 0D (quantum dot) system: alpha = 1 (i.e: no superconductivity and no anomalous Green's functions in the
@@ -74,12 +74,12 @@ def rho2sigma0DNormal(rhoG,rhoD,M,dt,t,omega,g,beta,delta=1e-6,midPoint=False,QG
     if not midPoint:
         eta = np.pi/(M*dt)*(0.001)
         rhoGrev = np.concatenate(([rhoG[-1]], rhoG[1:][::-1]))
-        rhoFpp = freq2time(rhoG * np.asarray([fermidirac(beta*om,default = QGdefault) for om in omega]),M,dt)
-        rhoFmp = freq2time(rhoG * np.asarray([fermidirac(-1.*beta*om,default = QGdefault) for om in omega]),M,dt)
-        rhoFpm = freq2time(rhoGrev * np.asarray([fermidirac(beta*om,default = QGdefault) for om in omega]),M,dt)
-        rhoFmm = freq2time(rhoGrev * np.asarray([fermidirac(-1.*beta*om,default = QGdefault) for om in omega]),M,dt)
-        rhoBpp = freq2time(rhoD * np.asarray([boseeinstein(beta*(om+eta),default = QGdefault) for om in omega]),M,dt)
-        rhoBmp = freq2time(rhoD * np.asarray([boseeinstein(-1.*beta*(om+eta),default = QGdefault) for om in omega]),M,dt)
+        rhoFpp = freq2time(rhoG * fermidirac_stable(beta*omega),M,dt)
+        rhoFmp = freq2time(rhoG * fermidirac_stable(-1.0*beta*omega),M,dt)
+        rhoFpm = freq2time(rhoGrev * fermidirac_stable(beta*omega),M,dt)
+        rhoFmm = freq2time(rhoGrev * fermidirac_stable(-1.0*beta*omega),M,dt)
+        rhoBpp = freq2time(rhoD * boseeinstein_stable(beta*(omega+eta)),M,dt)
+        rhoBmp = freq2time(rhoD * boseeinstein_stable(-1.0*beta*(omega+eta)),M,dt)
     
         SigmaInTime = (rhoFmp*rhoBmp - rhoFpp*rhoBpp) * np.exp(-np.abs(delta*t)) * np.heaviside(t,0)
         Sigma = 1j*(g**2) * time2freq(SigmaInTime,M,dt)
@@ -90,12 +90,12 @@ def rho2sigma0DNormal(rhoG,rhoD,M,dt,t,omega,g,beta,delta=1e-6,midPoint=False,QG
         #rhoG and rhoD are assumed to be evaluated at mid-points of omega and t grids.
         domega = np.pi/(M*dt)
         rhoGrevMidPoint = np.concatenate(([rhoG[-1]], rhoG[1:][::-1]))
-        rhoFppMidPoint = freq2timeMidPoint(rhoG * np.asarray([fermidirac(beta*(om+domega/2),default = QGdefault) for om in omega]),M,dt)
-        rhoFmpMidPoint = freq2timeMidPoint(rhoG * np.asarray([fermidirac(-1.*beta*(om+domega/2),default = QGdefault) for om in omega]),M,dt)
-        rhoFpmMidPoint = freq2timeMidPoint(rhoGrevMidPoint * np.asarray([fermidirac(beta*(om+domega/2),default = QGdefault) for om in omega]),M,dt)
-        rhoFmmMidPoint = freq2timeMidPoint(rhoGrevMidPoint * np.asarray([fermidirac(-1.*beta*(om+domega/2),default = QGdefault) for om in omega]),M,dt)
-        rhoBppMidPoint = freq2timeMidPoint(rhoD * np.asarray([boseeinstein(beta*(om+domega/2),default = QGdefault) for om in omega]),M,dt)
-        rhoBmpMidPoint = freq2timeMidPoint(rhoD * np.asarray([boseeinstein(-1.*beta*(om+domega/2),default = QGdefault) for om in omega]),M,dt)
+        rhoFppMidPoint = freq2timeMidPoint(rhoG * fermidirac_stable(beta*(omega+domega/2)),M,dt)
+        rhoFmpMidPoint = freq2timeMidPoint(rhoG * fermidirac_stable(-1.0*beta*(omega+domega/2)),M,dt)
+        rhoFpmMidPoint = freq2timeMidPoint(rhoGrevMidPoint * fermidirac_stable(beta*(omega+domega/2)),M,dt)
+        rhoFmmMidPoint = freq2timeMidPoint(rhoGrevMidPoint * fermidirac_stable(-1.0*beta*(omega+domega/2)),M,dt)
+        rhoBppMidPoint = freq2timeMidPoint(rhoD * boseeinstein_stable(beta*(omega+domega/2)),M,dt)
+        rhoBmpMidPoint = freq2timeMidPoint(rhoD * boseeinstein_stable(-1.0*beta*(omega+domega/2)),M,dt)
 
         SigmaInTimeMidPoint = (rhoFmpMidPoint*rhoBmpMidPoint - rhoFppMidPoint*rhoBppMidPoint)\
                             * np.exp(-np.abs(delta*(t+dt/2))) * np.heaviside(t+dt/2,0)
@@ -147,7 +147,7 @@ def YSYK_0DNormaliterator(GRomega,DRomega,grid,pars,beta,err=1e-5,ITERMAX=150,et
 
     diff = 1.
     diffG,diffD = (1.0,1.0)
-    epsilon = 0.04
+    epsilon = 0.1
 
     xG, xD = 0.5 - epsilon, 0.5 - epsilon
     xG2, xD2 = 0.5 - epsilon, 0.5 - epsilon
@@ -169,7 +169,7 @@ def YSYK_0DNormaliterator(GRomega,DRomega,grid,pars,beta,err=1e-5,ITERMAX=150,et
         rhoG = -0.5*np.imag(GRomega)
         rhoD = -0.5*np.imag(DRomega)
         
-        SigmaOmega,PiOmega = rho2sigma0DNormal(rhoG,rhoD,M,dt,t,omega,g,beta,delta=0,midPoint=midPointFlag,QGdefault=False)
+        SigmaOmega,PiOmega = rho2sigma0DNormal(rhoG,rhoD,M,dt,t,omega,g,beta,delta=0,midPoint=midPointFlag)
 
         if np.imag(SigmaOmega[M] > 0) :
             warnings.warn('Violation of causality : Pole of Gomega in UHP for beta = ' + str(beta))

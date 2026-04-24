@@ -120,6 +120,12 @@ def fermidirac(arg, default = True):
             answer = np.exp(-arg)/(1.0 + np.exp(-arg))
         return answer
 
+def fermidirac_stable(x):
+    '''
+    a more stable version of Fermi-Dirac statistics
+    '''
+    return np.where(x < 0,1.0/(1.0+np.exp(x)),np.exp(-x)/(1.0+np.exp(-x)))
+
 def boseeinstein(arg, default = True):
     '''
     returns 1/(exp(x)-1)
@@ -134,6 +140,12 @@ def boseeinstein(arg, default = True):
         elif arg>0: 
             answer = np.exp(-arg)/(1.0 - np.exp(-arg))
         return answer
+
+def boseeinstein_stable(x):
+    '''
+    a more stable version of Bose-Einstein statistics
+    '''
+    return np.where(x < 0,1.0/(-1.0+np.exp(x)),np.exp(-x)/(1.0-np.exp(-x)))
 
 def RealGridMaker(M,T):
     '''
