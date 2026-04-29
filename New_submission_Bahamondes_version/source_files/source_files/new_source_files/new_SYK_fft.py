@@ -30,7 +30,7 @@ def freq2timeMidPoint(array,M,dt):
 
     return prefOut*fft(prefIn*array)
 
-def freq2time(array,M,dt):
+def freq2time(fomega,M,dt):
     ''' Fourier transform from (real) frequency domain
         to (real) time domain
 
@@ -49,13 +49,12 @@ def freq2time(array,M,dt):
         NOTE: All notation is inspired by Aravind's original code, so all credit for the inspiration of
         this function goes to him :).
     '''
-    domega = np.pi/(M*dt)
-    tMinusM = np.arange(2*M)-M
+    dw = np.pi/(M*dt)
+    pref = (0.5/np.pi)*dw
+    tauminusM = np.arange(2*M) - M
     omega = np.arange(2*M)
-    prefOut = (domega/(2*np.pi))*np.exp(np.pi*1j*tMinusM)
-    prefIn = np.exp(np.pi*1j*omega)
-
-    return prefOut*fft(prefIn*array)
+    prefexp = np.exp(1j*np.pi*tauminusM)
+    return prefexp * pref * fft(np.exp(1j*np.pi*omega)*fomega)
 
 
 def time2freqMidPoint(array,M,dt):
@@ -83,7 +82,7 @@ def time2freqMidPoint(array,M,dt):
 
     return prefOut*ifft(prefIn*array)
 
-def time2freq(array,M,dt):
+def time2freq(ftau,M,dt):
     ''' Fourier transform from (real) frequency domain
         to (real) time domain
 
@@ -99,10 +98,11 @@ def time2freq(array,M,dt):
         NOTE: All notation is inspired by Aravind's original code, so all credit for the inspiration of
         this function goes to him :).
     '''
-    omegaMinusM = np.arange(2*M)-M
-    t = np.arange(2*M)
-    prefOut = 2*M*dt*np.exp(-np.pi*1j*omegaMinusM)
-    prefIn = np.exp(-np.pi*1j*t)
+    pref = 2 * M * dt
+    OmegaminusM = np.arange(2*M) - M
+    tau = np.arange(2*M)
+    prefexp = np.exp(-1j * np.pi * OmegaminusM)
+    return prefexp * pref * ifft(np.exp(-1j*np.pi*tau)*ftau) 
 
     return prefOut*ifft(prefIn*array)
 

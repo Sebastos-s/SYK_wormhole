@@ -4,6 +4,8 @@ import numpy as np
 import warnings
 from new_source_files.new_SYK_fft import *
 import matplotlib.pyplot as plt
+from IPython import display
+import time
 
 def rho2sigma2DNormal(rhoG,rhoD,M,dt,t,omega,v,g,beta,delta=1e-6,midPoint=False):
     '''
@@ -73,7 +75,7 @@ def rho2sigma0DNormal(rhoG,rhoD,M,dt,t,omega,g,beta,delta=1e-6,midPoint=False):
 
     if not midPoint:
         eta = np.pi/(M*dt)*(0.001)
-        rhoGrev = np.concatenate(([rhoG[-1]], rhoG[1:][::-1]))
+        rhoGrev = np.flip(rhoG)
         rhoFpp = freq2time(rhoG * fermidirac_stable(beta*omega),M,dt)
         rhoFmp = freq2time(rhoG * fermidirac_stable(-1.0*beta*omega),M,dt)
         rhoFpm = freq2time(rhoGrev * fermidirac_stable(beta*omega),M,dt)
@@ -82,14 +84,14 @@ def rho2sigma0DNormal(rhoG,rhoD,M,dt,t,omega,g,beta,delta=1e-6,midPoint=False):
         rhoBmp = freq2time(rhoD * boseeinstein_stable(-1.0*beta*(omega+eta)),M,dt)
     
         SigmaInTime = (rhoFmp*rhoBmp - rhoFpp*rhoBpp) * np.exp(-np.abs(delta*t)) * np.heaviside(t,0)
-        Sigma = 1j*(g**2) * time2freq(SigmaInTime,M,dt)
-    
+        Sigma = -1j*(g**2) * time2freq(SigmaInTime,M,dt)
+        #changed sign!
         PiInTime = (rhoFpp*rhoFpm - rhoFmp*rhoFmm) * np.exp(-np.abs(delta*t)) * np.heaviside(t,0)
-        Pi = 2j*(g**2) * time2freq(PiInTime,M,dt)
+        Pi = 2*1j*(g**2) * time2freq(PiInTime,M,dt)
     else:
         #rhoG and rhoD are assumed to be evaluated at mid-points of omega and t grids.
         domega = np.pi/(M*dt)
-        rhoGrevMidPoint = np.concatenate(([rhoG[-1]], rhoG[1:][::-1]))
+        rhoGrevMidPoint = np.flip(rhoG)
         rhoFppMidPoint = freq2timeMidPoint(rhoG * fermidirac_stable(beta*(omega+domega/2)),M,dt)
         rhoFmpMidPoint = freq2timeMidPoint(rhoG * fermidirac_stable(-1.0*beta*(omega+domega/2)),M,dt)
         rhoFpmMidPoint = freq2timeMidPoint(rhoGrevMidPoint * fermidirac_stable(beta*(omega+domega/2)),M,dt)
@@ -107,26 +109,28 @@ def rho2sigma0DNormal(rhoG,rhoD,M,dt,t,omega,g,beta,delta=1e-6,midPoint=False):
 
     return [Sigma, Pi]
 
-def Dav_rho2sigma0DNormal(rhoG,rhoD,M,t,g,beta,BMf,kappa=1,delta=1e-6):
+def Dav_rho2sigma0DNormal(rhoG,rhoD,M,t,g,beta,BMf,delta=1e-6):
     '''
     Direct implementation of Davide's email
     '''
     dt = t[2]-t[1]
     fdplus,fdminus,beplus,beminus = BMf
-    ADt = (1/np.pi) * freq2time(rhoD,M,dt)
-    aGt = (1/np.pi) * freq2time(rhoG * fdplus, M,dt)
-    AGt = (1/np.pi) * freq2time(rhoG,M,dt)
-    aDt = (1/np.pi) * freq2time(rhoD * beplus, M,dt)
+    ADt = freq2time(rhoD,M,dt)
+    aGt = freq2time(rhoG * fdplus, M,dt)
+    AGt = freq2time(rhoG,M,dt)
+    aDt = freq2time(rhoD * beplus, M,dt)
+    #aGtm = freq2time(rhoG * fdminus, M,dt)
+    aDtm = freq2time(rhoD * beminus, M,dt)
 
-    argSigma = (ADt * aGt - AGt * np.conj(aDt)) * np.heaviside(t,0)
-    Sigma = -1j*(g**2)*kappa* time2freq(argSigma,M,dt)
+    argSigma = (ADt * aGt - AGt * np.conj(aDt)) * np.heaviside(t,0)*np.exp(-delta*np.abs(t))
+    Sigma = -1j*(g**2)*time2freq(argSigma,M,dt)
 
-    argPi = (AGt * np.conj(aGt) - np.conj(AGt) * (aGt)) * np.heaviside(t,0)
-    Pi = 2j*(g**2)*kappa* time2freq(argPi,M,dt)
-
+    argPi = (AGt * np.conj(aGt) - np.conj(AGt) * aGt) * np.heaviside(t,0)*np.exp(-delta*np.abs(t))
+    Pi = 2j*(g**2)*time2freq(argPi,M,dt)
+    
     return [Sigma,Pi]
 
-def YSYK_0DNormaliterator(GRomega,DRomega,grid,pars,beta,err=1e-5,ITERMAX=150,eta=1e-6,verbose=True,midPointFlag=False):
+def YSYK_0DNormaliterator(GRomega,DRomega,grid,pars,beta,err=1e-5,ITERMAX=150,eta=1e-6,epsilon = 0.01,slowly = False,midPointFlag=False):
     '''
     This function returns a numerical profile of the Green's functions and self-energies for bosons and fermions
     in the quantum dot YSYK model in the normal phase (with time-reversal symmetry storngly broken, and therefore
@@ -143,17 +147,24 @@ def YSYK_0DNormaliterator(GRomega,DRomega,grid,pars,beta,err=1e-5,ITERMAX=150,et
     M,omega,t = grid
     g,mu,m02 = pars
     dt = t[1]-t[0]
+    dw = omega[1]-omega[0]
     itern = 0
+
+    if slowly:
+        fig, axs = plt.subplots(nrows = 3,ncols = 2,figsize=(14,7))
 
     diff = 1.
     diffG,diffD = (1.0,1.0)
-    epsilon = 0.5
-
     xG, xD = 0.5 - epsilon, 0.5 - epsilon
     xG2, xD2 = 0.5 - epsilon, 0.5 - epsilon
 
     flag = True
     diffs_list = []
+    fdplus = np.array([fermidirac(beta*omegaval, default = False) for omegaval in omega])
+    fdminus = np.array([fermidirac(-1.0*beta*omegaval, default = False) for omegaval in omega])
+    beplus = np.array([boseeinstein(beta*omegaval, default = False) for omegaval in omega])
+    beminus = np.array([boseeinstein(-1.0*beta*omegaval, default = False) for omegaval in omega])
+    BMf = [fdplus, fdminus, beplus, beminus]
 
     while (diff>err and itern<ITERMAX and flag):   
         itern += 1 
@@ -169,23 +180,32 @@ def YSYK_0DNormaliterator(GRomega,DRomega,grid,pars,beta,err=1e-5,ITERMAX=150,et
         rhoG = -0.5*np.imag(GRomega)
         rhoD = -0.5*np.imag(DRomega)
         
-        SigmaOmega,PiOmega = rho2sigma0DNormal(rhoG,rhoD,M,dt,t,omega,g,beta,delta=0,midPoint=midPointFlag)
+        SigmaOmega,PiOmega = Dav_rho2sigma0DNormal(rhoG,rhoD,M,t,g,beta,BMf,delta=0)
 
         if np.imag(SigmaOmega[M] > 0) :
-            warnings.warn('Violation of causality : Pole of Gomega in UHP for beta = ' + str(beta))
+            print('Violation of causality : Pole of Gomega in UHP for beta = ' + str(beta))
+            break
         if itern == 1:
-            GRomega = (2*epsilon)/(omega + 1j*eta + mu - SigmaOmega) + (1-2*epsilon)*GRoldomega
-            DRomega = (2*epsilon)/(-1.0*(omega+1j*eta)**2 + m02 - PiOmega) + (1-2*epsilon)*DRoldomega
+            if midPointFlag == False:
+                GRomega = (2*epsilon)/(omega + 1j*eta + mu - SigmaOmega) + (1-2*epsilon)*GRoldomega
+                DRomega = (2*epsilon)/(-1.0*(omega+1j*eta)**2 + m02 - PiOmega) + (1-2*epsilon)*DRoldomega
+            else:
+                GRomega = (2*epsilon)/(omega + dw/2 + 1j*eta + mu - SigmaOmega) + (1-2*epsilon)*GRoldomega
+                DRomega = (2*epsilon)/(-1.0*(omega + dw/2+1j*eta)**2 + m02 - PiOmega) + (1-2*epsilon)*DRoldomega
         else:
-            GRomega = (2*epsilon)/(omega + 1j*eta + mu - SigmaOmega) + xG2*GRold2omega + xG*GRoldomega
-            DRomega = (2*epsilon)/(-1.0*(omega+1j*eta)**2 + m02 - PiOmega) + xD2*DRold2omega + xD*DRoldomega
+            if midPointFlag == False:
+                GRomega = (2*epsilon)/(omega + 1j*eta + mu - SigmaOmega) + xG2*GRold2omega + xG*GRoldomega
+                DRomega = (2*epsilon)/(-1.0*(omega+1j*eta)**2 + m02 - PiOmega) + xD2*DRold2omega + xD*DRoldomega
+            else:
+                GRomega = (2*epsilon)/(omega + dw/2 + 1j*eta + mu - SigmaOmega) + xG2*GRold2omega + xG*GRoldomega
+                DRomega = (2*epsilon)/(-1.0*(omega + dw/2 +1j*eta)**2 + m02 - PiOmega) + xD2*DRold2omega + xD*DRoldomega                
 
         #causality constraint
         if midPointFlag:
             GRt = freq2timeMidPoint(GRomega,M,dt)
             DRt = freq2timeMidPoint(DRomega,M,dt)
-            GRt[:M] = 0  
-            DRt[:M] = 0
+            GRt[:M-1] = 0  
+            DRt[:M-1] = 0
             GRomega = time2freqMidPoint(GRt,M,dt)
             DRomega = time2freqMidPoint(DRt,M,dt)
         else:
@@ -205,28 +225,53 @@ def YSYK_0DNormaliterator(GRomega,DRomega,grid,pars,beta,err=1e-5,ITERMAX=150,et
         diffs_list.append(diff)
         diffG,diffD = diff,diff
 
-        if verbose:
-            print("itern = ",itern, " , diff = ", diffG, diffD," , x = ", xG, xD)
-        if verbose and itern % 100 == 0:
-            fig, ax = plt.subplots(4)
-            fig.suptitle('Iteration = ' + str(itern) + ', beta = ' + str(beta))
-            ax[0].plot(omega, -0.5*np.imag(GRomega), label = 'Im(GR)')
-            ax[1].plot(omega, -0.5*np.imag(DRomega), label = 'Im(DR)')
-            ax[0].set_xlabel(r'$\omega$')
-            ax[0].set_ylabel(r'$-Im G^R(\omega)$')
-            ax[0].set_xlim(0,4)
-            ax[1].set_xlabel(r'$\omega$')
-            ax[1].set_ylabel(r'$-Im D^R(\omega)$')
-            ax[1].set_xlim(0,2)
-            ax[2].plot(omega, -0.5*np.imag(SigmaOmega), label = 'Sigma')
-            ax[3].plot(omega, -0.5*np.imag(PiOmega), label = 'Pi')
+        if slowly:
+            for row in range(3):
+                for col in range(2):
+                    axs[row,col].clear()
+                    axs[row,col].grid(True)
+            axs[0,0].set_xlim(-2,2)
+            axs[0,1].set_xlim(-2,2)
+            axs[1,0].set_xlim(-2,2)
+            axs[1,1].set_xlim(-2,2)
+            axs[2,0].set_xlim(0,1)
+            axs[2,1].set_xlim(0,1)
+            axs[0,0].set_xlabel(r'$\omega$')
+            axs[0,1].set_xlabel(r'$\omega$')
+            axs[0,0].set_ylabel(r'$\Re(\Sigma(\omega))$')
+            axs[0,1].set_ylabel(r'$\Re(\Pi(\omega))$')
+            axs[1,0].set_xlabel(r'$\omega$')
+            axs[1,1].set_xlabel(r'$\omega$')
+            axs[1,0].set_ylabel(r'$\Im(\Sigma(\omega))$')
+            axs[1,1].set_ylabel(r'$\Im(\Pi(\omega))$')
+            axs[2,0].set_xlabel(r'$\log(\omega)$')
+            axs[2,1].set_xlabel(r'$\omega$')
+            axs[2,0].set_ylabel(r'$\log(\rho_F(\omega))$')
+            axs[2,1].set_ylabel(r'$-\rho_B(\omega)$')
 
-            #bigger size and tight layout
-            fig.set_size_inches(6,6)
-            fig.tight_layout()
+            axs[0,0].plot(omega,np.real(SigmaOmega))
+            axs[0,1].plot(omega,np.real(PiOmega))
 
-            plt.show()
+            axs[1,0].plot(omega,np.imag(SigmaOmega))
+            axs[1,1].plot(omega,np.imag(PiOmega))
+
+            axs[2,0].plot(np.log(omega[M+1:]),np.log(np.abs(0.5*np.imag(GRomega[M+1:]))))
+            axs[2,1].plot(omega,0.5*np.imag(DRomega))
+
+            axs[0,0].legend(loc = 'upper left')
+            axs[0,1].legend(loc = 'upper left')
+            axs[1,0].legend(loc = 'upper left')
+            axs[1,1].legend(loc = 'upper left')
+
+            fig.suptitle(rf'$\beta$ = {beta}. Iteration = {itern}. (diffG , diffD) = ({diffG} , {diffD})')
+
+            display.clear_output(wait=True)
+            display.display(fig)
+            time.sleep(0.0001)
+
     INFO = (itern, diff)
+    if slowly:
+        plt.close()
     return (GRomega,DRomega, INFO)
 
 def CrazyGconfReal(omega,g,beta,eta=0):
